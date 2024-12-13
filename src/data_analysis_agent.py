@@ -5,7 +5,7 @@ from transformers import HfApiEngine
 from transformers.agents import ReactCodeAgent, ReactJsonAgent, HfApiEngine, DuckDuckGoSearchTool, ManagedAgent, VisitWebpageTool
 from huggingface_hub import login, InferenceClient
 
-data_path = "./data/"
+data_path = "../data/"
 
 # authenticate
 with open("/Users/yabra/keys/hf_key.txt") as f:
@@ -26,7 +26,6 @@ login(hf_key)
 reasoning_model_path = "meta-llama/Meta-Llama-3-70B-Instruct"
 coding_model_path = "Qwen/Qwen2.5-72B-Instruct"
 
-
 # Agent 1
 data_exploration_agent = ReactCodeAgent(
     tools=[],
@@ -45,6 +44,11 @@ hypothesis_formulation_agent = ReactJsonAgent(
     tools=[],
     llm_engine=reasoning_model_path,
 )
+managed_agent2 = ManagedAgent(
+    agent=hypothesis_formulation_agent,
+    name="hypothesis_formulation",
+    description="Formulations several interesting hypothesis that could be explored from the given data."
+)
 
 # Agent 3
 code_implementation_agent = ReactCodeAgent(
@@ -52,11 +56,21 @@ code_implementation_agent = ReactCodeAgent(
     llm_engine=coding_model_path,
     additional_authorized_imports=["numpy", "pandas", "matplotlib.pyplot", "seaborn", "sklearn"],
 )
+managed_agent3 = ManagedAgent(
+    agent=code_implementation_agent,
+    name="code_implementation",
+    description="Translate hypothesis into actionable python code. Runs the required analysis and reports back on them."
+)
 
 # Agent 4
 conclusion_generation_agent = ReactJsonAgent(
     tools=[],
     llm_engine=reasoning_model_path
+)
+managed_agent4 = ManagedAgent(
+    agent=conclusion_generation_agent,
+    name="conclusion_generation",
+    description="Use the results from the analysis to generate conclusions and export them in markdown"
 )
 
 #%%
@@ -70,10 +84,16 @@ llm_engine = HfApiEngine(model=reasoning_model_path)
 manager_agent = ReactCodeAgent(
     tools=[], 
     llm_engine=llm_engine, 
-    managed_agents=[managed_parse_input_agent, 
-                    managed_find_lyrics_site_agent, 
-                    managed_web_parsing_agent
+    managed_agents=[managed_agent1,
+                    managed_agent2,
+                    managed_agent3,
+                    managed_agent4 
                     ]
 )
 
+# %%
 
+task = f"Analyze the california_housing.csv file in the path: {data_path}"
+manager_agent.run(task)
+
+# %%
