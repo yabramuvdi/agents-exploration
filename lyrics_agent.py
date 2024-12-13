@@ -5,12 +5,12 @@
 #%%
 
 # installations
-# pip install duckduckgo-search
+# pip install duckduckgo-search markdownify
 
 #%%
 
 from transformers import HfApiEngine
-from transformers.agents import ReactCodeAgent, HfApiEngine, DuckDuckGoSearchTool, ManagedAgent
+from transformers.agents import ReactCodeAgent, ReactJsonAgent, HfApiEngine, DuckDuckGoSearchTool, ManagedAgent, VisitWebpageTool
 from huggingface_hub import login, InferenceClient
 
 # authenticate
@@ -31,7 +31,7 @@ llm_model_path = "meta-llama/Meta-Llama-3-70B-Instruct"
 llm_engine = HfApiEngine(model=llm_model_path)
 
 # Agent 1
-parse_input_agent = ReactCodeAgent(tools=[], llm_engine=llm_engine)
+parse_input_agent = ReactJsonAgent(tools=[], llm_engine=llm_engine)
 managed_parse_input_agent = ManagedAgent(
     agent=parse_input_agent,
     name="parse_input",
@@ -39,21 +39,33 @@ managed_parse_input_agent = ManagedAgent(
 )
 
 # Agent 2
-find_lyrics_site_agent = ReactCodeAgent(tools=[DuckDuckGoSearchTool()], llm_engine=llm_engine)
+find_lyrics_site_agent = ReactJsonAgent(tools=[DuckDuckGoSearchTool()], llm_engine=llm_engine)
 managed_find_lyrics_site_agent = ManagedAgent(
     agent=find_lyrics_site_agent ,
     name="find_lyrics_site",
     description="Runs web searches to find the lyrics of a song. Give it your query as an argument. Returns the best website for the required lyrics."
 )
 
+
 # Agent 3
-web_parsing_agent = ReactCodeAgent(tools=[DuckDuckGoSearchTool()], 
+web_parsing_agent = ReactCodeAgent(tools=[DuckDuckGoSearchTool(), VisitWebpageTool()], 
                                    llm_engine=llm_engine,
-                                   additional_authorized_imports=['requests', 'bs4'])
+                                   additional_authorized_imports=['requests', 'bs4']
+                                   )
+
 managed_web_parsing_agent = ManagedAgent(
     agent=web_parsing_agent,
     name="web_parsing",
     description="Retrives only the lyrics from the website provided in the query."
+)
+
+# Agent 4
+lyrics_cleaning_agent = ReactJsonAgent(tools=[], llm_engine=llm_engine)
+
+managed_lyrics_cleaning_agent = ManagedAgent(
+    agent=lyrics_cleaning_agent,
+    name="lyrics_cleaning",
+    description="Cleans the extracted text from the lyrics website to only contain the text from the lyrics of the relevant song. Returns the result in markdwon."
 )
 
 #%%
@@ -67,7 +79,8 @@ manager_agent = ReactCodeAgent(
     llm_engine=llm_engine, 
     managed_agents=[managed_parse_input_agent, 
                     managed_find_lyrics_site_agent, 
-                    managed_web_parsing_agent
+                    managed_web_parsing_agent,
+                    managed_lyrics_cleaning_agent,
                     ]
 )
 
