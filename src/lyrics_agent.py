@@ -10,7 +10,8 @@
 #%%
 
 from transformers import HfApiEngine
-from transformers.agents import ReactCodeAgent, ReactJsonAgent, HfApiEngine, DuckDuckGoSearchTool, ManagedAgent, VisitWebpageTool
+from transformers.agents import ReactCodeAgent, ReactJsonAgent, HfApiEngine, ManagedAgent
+from transformers.agents.search import DuckDuckGoSearchTool, VisitWebpageTool
 from huggingface_hub import login, InferenceClient
 
 # authenticate
@@ -58,17 +59,17 @@ web_parsing_agent = ReactCodeAgent(tools=[DuckDuckGoSearchTool(), VisitWebpageTo
 managed_web_parsing_agent = ManagedAgent(
     agent=web_parsing_agent,
     name="web_parsing_lyrics",
-    description="Visits the website provided (DO NOT MODIFY THE URL) and retrives lyrics from the song. Returns the extracted text."
+    description="Visits the website provided (DO NOT MODIFY THE URL) and retrives lyrics from the song. Returns the extracted text. If it is not possible to clean the text, just return all the content of the webpage."
 )
 
-# Agent 4
-lyrics_cleaning_agent = ReactJsonAgent(tools=[], llm_engine=llm_engine)
+# # Agent 4
+# lyrics_cleaning_agent = ReactJsonAgent(tools=[], llm_engine=llm_engine)
 
-managed_lyrics_cleaning_agent = ManagedAgent(
-    agent=lyrics_cleaning_agent,
-    name="lyrics_cleaning",
-    description="Cleans the extracted text from the lyrics website to only contain the text from the lyrics of the relevant song. Returns the result in markdwon."
-)
+# managed_lyrics_cleaning_agent = ManagedAgent(
+#     agent=lyrics_cleaning_agent,
+#     name="lyrics_cleaning",
+#     description="Cleans the extracted text from the lyrics website to only contain the text from the lyrics of the relevant song. Returns the result in markdwon."
+# )
 
 #%%
 
@@ -82,13 +83,27 @@ manager_agent = ReactCodeAgent(
     managed_agents=[managed_parse_input_agent, 
                     managed_find_lyrics_site_agent, 
                     managed_web_parsing_agent,
-                    managed_lyrics_cleaning_agent,
+                    #managed_lyrics_cleaning_agent,
                     ]
 )
 
 #%%
 
-task = "Provide the lyrics to hips dont lie by Shakira"
-manager_agent.run(task)
+task = "Get the lyrics to hips dont lie"
+max_attempts = 5
+done = False
+attempts = 0
+while not done and attempts < max_attempts:
+    result = manager_agent.run(task)
+    try:
+        final_lyrics = result["Task outcome (extremely detailed version)"]
+        done = True
+    except Exception as e:
+        print(f"{e}")
+        print("Retrying")
+        attempts += 1
 
+print(final_lyrics)
+
+    
 # %%
